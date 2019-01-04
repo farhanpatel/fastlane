@@ -19,14 +19,14 @@ module Snapshot
 
       def options(language, locale)
         config = Snapshot.config
-        result_bundle_path = resolve_result_bundle_path(language, locale) if config[:result_bundle]
-
+        result_bundle_path = resolve_result_bundle_path(language, locale)
         options = []
         options += project_path_array
         options << "-sdk '#{config[:sdk]}'" if config[:sdk]
         options << "-derivedDataPath '#{derived_data_path}'"
         options << "-resultBundlePath '#{result_bundle_path}'" if result_bundle_path
         options << config[:xcargs] if config[:xcargs]
+
         return options
       end
 

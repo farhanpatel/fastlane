@@ -13,13 +13,15 @@ module Snapshot
       attachments_path = File.join(containing, "Attachments")
 
       language_folder = File.join(Snapshot.config[:output_directory], dir_name)
+      UI.success("lang folder is '#{language_folder}'...")
+
       FileUtils.mkdir_p(language_folder)
 
       # Xcode 9 introduced a new API to take screenshots which allows us
       # to avoid parsing the generated plist file to find the screenshots
       # and instead, we can save them to a known location to use later on.
       if Helper.xcode_at_least?(9)
-        return collect_screenshots_for_language_folder(language_folder)
+        return collect_screenshots_for_language_folder(language_folder,dir_name)
       else
         to_store = attachments(containing)
         matches = output.scan(/snapshot: (.*)/)
@@ -40,26 +42,26 @@ module Snapshot
         device_name = device_type.delete(" ")
 
         components = [launch_arguments_index].delete_if { |a| a.to_s.length == 0 }
-        screenshot_name = device_name + "-" + name + "-" + Digest::MD5.hexdigest(components.join("-")) + ".png"
+        screenshot_name = device_name + "-" + name + "-" + Digest::MD5.hexdigest(components.join("-"))  + "-#{dir_name}.png"
         output_path = File.join(language_folder, screenshot_name)
 
         from_path = File.join(attachments_path, filename)
-
+        UI.success("This is the output path (#{output_path})")
         copy(from_path, output_path)
       end
       return true
     end
 
     # Returns true if it succeeds
-    def self.collect_screenshots_for_language_folder(destination)
-      screenshots = Dir["#{SCREENSHOTS_DIR}/*.png"]
+    def self.collect_screenshots_for_language_folder(destination,lang)
+      screenshots = Dir["#{SCREENSHOTS_DIR}/*-#{lang}.png"]
       return false if screenshots.empty?
       screenshots.each do |screenshot|
         filename = File.basename(screenshot)
         to_path = File.join(destination, filename)
         copy(screenshot, to_path)
       end
-      FileUtils.rm_rf(SCREENSHOTS_DIR)
+      # FileUtils.rm_rf(SCREENSHOTS_DIR)
       return true
     end
 
@@ -67,7 +69,7 @@ module Snapshot
       if FastlaneCore::Globals.verbose?
         UI.success("Copying file '#{from_path}' to '#{to_path}'...")
       else
-        UI.success("Copying '#{to_path}'...")
+        UI.success("Copying file '#{from_path}' to '#{to_path}'...")
       end
       FileUtils.cp(from_path, to_path)
     end

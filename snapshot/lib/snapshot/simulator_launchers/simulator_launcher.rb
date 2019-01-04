@@ -43,33 +43,23 @@ module Snapshot
     def take_screenshots_simultaneously
       languages_finished = {}
       launcher_config.launch_args_set.each do |launch_args|
-        launcher_config.languages.each_with_index do |language, language_index|
-          locale = nil
-          if language.kind_of?(Array)
-            locale = language[1]
-            language = language[0]
-          end
+        all_devices = launcher_config.devices
+
+        # slice the languages into batches. Each batch will run on a single device
+        langauge_batches = launcher_config.languages.each_slice(all_devices.count).to_a
+        # launcher_config.languages.each_with_index do |language, language_index|
 
           # Clear logs so subsequent xcodebuild executions dont append to old ones
-          log_path = xcodebuild_log_path(language: language, locale: locale)
-          File.delete(log_path) if File.exist?(log_path)
 
-          # Break up the array of devices into chunks that can
-          # be run simultaneously.
-          if launcher_config.concurrent_simulators?
-            all_devices = launcher_config.devices
-            # We have to break up the concurrent simulators by device version too, otherwise there is an error (see #10969)
-            by_simulator_version = all_devices.group_by { |d| FastlaneCore::DeviceManager.latest_simulator_version_for_device(d) }.values
-            device_batches = by_simulator_version.flat_map { |a| a.each_slice(default_number_of_simultaneous_simulators).to_a }
-          else
-            # Put each device in it's own array to run tests one at a time
-            device_batches = launcher_config.devices.map { |d| [d] }
-          end
 
-          device_batches.each do |devices|
-            languages_finished[language] = launch_simultaneously(devices, language, locale, launch_args)
+          #language_batches looks like [["ca,"fr"],["zh_CN","zh"]]
+          langauge_batches.each do |languages|
+              #pass in the entire batch of langauges. and then parse locale later. (thus the empty string)
+              res = launch_simultaneously(all_devices, languages, "", launch_args)
+              languages.each do |lang|
+                languages_finished[lang] = res
+              end
           end
-        end
       end
       launcher_config.devices.each_with_object({}) do |device, results_hash|
         results_hash[device] = languages_finished
@@ -82,6 +72,7 @@ module Snapshot
       add_media(devices, :photo, launcher_config.add_photos) if launcher_config.add_photos
       add_media(devices, :video, launcher_config.add_videos) if launcher_config.add_videos
 
+      #langauge in this command doesnt matter (I think?)
       command = TestCommandGenerator.generate(
         devices: devices,
         language: language,
@@ -93,7 +84,7 @@ module Snapshot
 
       execute(command: command, language: language, locale: locale, launch_args: launch_arguments, devices: devices)
 
-      return copy_screenshots(language: language, locale: locale, launch_args: launch_arguments)
+      return copy_screenshots(language: language, locale: nil, launch_args: launch_arguments)
     end
 
     def execute(retries = 0, command: nil, language: nil, locale: nil, launch_args: nil, devices: nil)
@@ -165,9 +156,17 @@ module Snapshot
     end
 
     def copy_screenshots(language: nil, locale: nil, launch_args: nil)
-      raw_output = File.read(xcodebuild_log_path(language: language, locale: locale))
-      dir_name = locale || language
-      return Collector.fetch_screenshots(raw_output, dir_name, '', launch_args.first)
+      locale = nil
+      language.each do |lang|
+        if lang.kind_of?(Array)
+          locale = lang[1]
+          lang = lang[0]
+        end
+        raw_output = File.read(xcodebuild_log_path(language: lang, locale: locale))
+        dir_name = locale || lang
+        UI.important(dir_name)
+        Collector.fetch_screenshots(raw_output, dir_name, '', launch_args.first)
+      end
     end
 
     def test_results_path

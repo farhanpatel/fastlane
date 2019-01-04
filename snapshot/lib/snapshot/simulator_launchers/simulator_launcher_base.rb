@@ -26,12 +26,20 @@ module Snapshot
       @current_number_of_retries_due_to_failing_simulator || 0
     end
 
+    #locale is empty here. Parse the locale from the langauge array
     def prepare_for_launch(device_types, language, locale, launch_arguments)
-      prepare_directories_for_launch(language: language, locale: locale, launch_arguments: launch_arguments)
-      prepare_simulators_for_launch(device_types, language: language, locale: locale)
+      language.each_with_index do |lang, index|
+        if lang.kind_of?(Array)
+          locale = lang[1]
+          lang = lang[0]
+        end
+
+        prepare_directories_for_launch(device: device_types[index], language: lang, locale: locale, launch_arguments: launch_arguments)
+      end
+      prepare_simulators_for_launch(device_types, languages: language, locale: locale)
     end
 
-    def prepare_directories_for_launch(language: nil, locale: nil, launch_arguments: nil)
+    def prepare_directories_for_launch(device: nil, language: nil, locale: nil, launch_arguments: nil)
       screenshots_path = TestCommandGenerator.derived_data_path
       FileUtils.rm_rf(File.join(screenshots_path, "Logs"))
       FileUtils.rm_rf(screenshots_path) if launcher_config.clean
@@ -40,12 +48,12 @@ module Snapshot
       FileUtils.mkdir_p(CACHE_DIR)
       FileUtils.mkdir_p(SCREENSHOTS_DIR)
 
-      File.write(File.join(CACHE_DIR, "language.txt"), language)
-      File.write(File.join(CACHE_DIR, "locale.txt"), locale || "")
+      File.write(File.join(CACHE_DIR, "#{device}-language.txt"), language)
+      File.write(File.join(CACHE_DIR, "#{device}-locale.txt"), locale || "")
       File.write(File.join(CACHE_DIR, "snapshot-launch_arguments.txt"), launch_arguments.last)
     end
 
-    def prepare_simulators_for_launch(device_types, language: nil, locale: nil)
+    def prepare_simulators_for_launch(device_types, languages: nil, locale: nil)
       # Kill and shutdown all currently running simulators so that the following settings
       # changes will be picked up when they are started again.
       Snapshot.kill_simulator # because of https://github.com/fastlane/fastlane/issues/2533
@@ -53,16 +61,19 @@ module Snapshot
 
       Fixes::SimulatorZoomFix.patch
       Fixes::HardwareKeyboardFix.patch
-
-      device_types.each do |type|
+      languages.each_with_index do |language, myindex|
+        if language.kind_of?(Array)
+          locale = language[1]
+          language = language[0]
+        end
         if launcher_config.erase_simulator || launcher_config.localize_simulator
-          erase_simulator(type)
+          erase_simulator(device_types[myindex])
           if launcher_config.localize_simulator
-            localize_simulator(type, language, locale)
+            localize_simulator(device_types[myindex], language, locale)
           end
         elsif launcher_config.reinstall_app
           # no need to reinstall if device has been erased
-          uninstall_app(type)
+          uninstall_app(device_types[myindex])
         end
       end
     end

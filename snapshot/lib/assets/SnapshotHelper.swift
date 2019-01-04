@@ -84,12 +84,12 @@ open class Snapshot: NSObject {
     }
 
     class func setLanguage(_ app: XCUIApplication) {
-        guard let cacheDirectory = self.cacheDirectory else {
+        guard let cacheDirectory = self.cacheDirectory, let simulator = ProcessInfo().environment["SIMULATOR_DEVICE_NAME"] else {
             print("CacheDirectory is not set - probably running on a physical device?")
             return
         }
         
-        let path = cacheDirectory.appendingPathComponent("language.txt")
+        let path = cacheDirectory.appendingPathComponent("\(simulator)-language.txt")
 
         do {
             let trimCharacterSet = CharacterSet.whitespacesAndNewlines
@@ -101,12 +101,12 @@ open class Snapshot: NSObject {
     }
 
     class func setLocale(_ app: XCUIApplication) {
-        guard let cacheDirectory = self.cacheDirectory else {
+        guard let cacheDirectory = self.cacheDirectory, let simulator = ProcessInfo().environment["SIMULATOR_DEVICE_NAME"] else {
             print("CacheDirectory is not set - probably running on a physical device?")
             return
         }
         
-        let path = cacheDirectory.appendingPathComponent("locale.txt")
+        let path = cacheDirectory.appendingPathComponent("\(simulator)-locale.txt")
 
         do {
             let trimCharacterSet = CharacterSet.whitespacesAndNewlines
@@ -172,7 +172,7 @@ open class Snapshot: NSObject {
             let window = app.windows.firstMatch
             let screenshot = window.screenshot()
             guard let simulator = ProcessInfo().environment["SIMULATOR_DEVICE_NAME"], let screenshotsDir = screenshotsDirectory else { return }
-            let path = screenshotsDir.appendingPathComponent("\(simulator)-\(name).png")
+            let path = screenshotsDir.appendingPathComponent("\(simulator)-\(name)-\(deviceLanguage).png")
             do {
                 try screenshot.pngRepresentation.write(to: path)
             } catch let error {
